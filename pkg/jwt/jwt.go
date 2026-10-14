@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -128,16 +129,19 @@ func JWTDecode(jwt string, m interface{}) error {
 	return json.Unmarshal(data, m)
 }
 
-// 签名方法
+// 签名方法：标准 HMAC-SHA256。
+//
+// 旧实现写成 s.Sum([]byte(secret))，但 hash.Sum(b) 的语义是「把当前摘要追加到 b
+// 之后」，产出的是 hex(secret ‖ sha256(data))——前 2*len(secret) 个 hex 字符即
+// secret 明文。token 必须下发前端，等于把签名密钥公开出去。
 func jwtHS256(secret string, data string) (string, error) {
 
-	s := sha256.New()
-	_, err := s.Write([]byte(data))
-	if err != nil {
+	mac := hmac.New(sha256.New, []byte(secret))
+	if _, err := mac.Write([]byte(data)); err != nil {
 		return "", err
 	}
 
-	return hex.EncodeToString(s.Sum([]byte(secret))), nil
+	return hex.EncodeToString(mac.Sum(nil)), nil
 }
 
 func jwtRS256() (string, error) {
